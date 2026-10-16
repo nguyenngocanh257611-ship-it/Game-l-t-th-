@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thẻ Đặc Quyền Linh Thú 3D</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@600;700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      overflow-x: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    .font-title {
+      font-family: 'Comfortaa', cursive, sans-serif;
+    }
+
+    /* 3D Scene Perspective */
+    .scene-viewport {
+      perspective: 1200px;
+      transform-style: preserve-3d;
+    }
+
+    .orbit-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+    }
+
+    /* Card 3D Flip Mechanics */
+    .card-3d-wrapper {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 145px;
+      height: 215px;
+      margin-left: -72.5px;
+      margin-top: -107.5px;
+      transform-style: preserve-3d;
+      transition: transform 0.15s ease-out;
+      cursor: pointer;
+    }
+
+    @media (min-width: 768px) {
+      .card-3d-wrapper {
+        width: 175px;
+        height: 255px;
+        margin-left: -87.5px;
+        margin-top: -127.5px;
+      }
+    }
+
+    .card-flipper {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .card-flipper.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 24px;
+    }
+
+    /* Front side (Gradient Pastel like in sample image) */
+    .card-front {
+      background: linear-gradient(165deg, #f8719d 0%, #ec4899 28%, #818cf8 75%, #38bdf8 100%);
+      border: 3.5px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 0 22px rgba(244, 114, 182, 0.7), 0 10px 25px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Back side (Magic Mystery Card) */
+    .card-back {
+      background: linear-gradient(145deg, #312e81 0%, #4c1d95 50%, #831843 100%);
+      border: 3.5px solid rgba(251, 191, 36, 0.9);
+      box-shadow: 0 0 25px rgba(236, 72, 153, 0.7), 0 10px 25px rgba(0, 0, 0, 0.5);
+      transform: rotateY(180deg);
+    }
+
+    /* Radial glow backdrop */
+    .bg-deep-space {
+      background: radial-gradient(circle at 50% 40%, #1e1338 0%, #0d091a 60%, #05040a 100%);
+    }
+
+    /* Elimination effect class */
+    .eliminating {
+      animation: explodeVanish 1.1s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+      pointer-events: none !important;
+    }
+
+    @keyframes explodeVanish {
+      0% {
+        transform: translate(-50%, -50%) scale(1.4) rotate(0deg);
+        filter: brightness(2) drop-shadow(0 0 35px #ec4899);
+        opacity: 1;
+      }
+      40% {
+        transform: translate(-50%, -50%) scale(1.6) rotate(15deg);
+        filter: brightness(3) drop-shadow(0 0 50px #38bdf8);
+        opacity: 0.9;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(0.01) rotate(180deg);
+        filter: blur(15px) brightness(4);
+        opacity: 0;
+      }
+    }
+
+    /* Glowing pulse for active modal */
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 30px rgba(236, 72, 153, 0.6), 0 0 60px rgba(56, 189, 248, 0.4); }
+      50% { box-shadow: 0 0 50px rgba(236, 72, 153, 0.9), 0 0 80px rgba(56, 189, 248, 0.7); }
+    }
+    .glow-pulse {
+      animation: pulseGlow 2.5s infinite ease-in-out;
+    }
+
+    /* Sunburst spin */
+    @keyframes spinSlow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .sunburst {
+      animation: spinSlow 24s linear infinite;
+    }
+  </style>
+</head>
+
+<body class="bg-deep-space text-white min-h-screen relative overflow-hidden flex flex-col justify-between">
+  
+  <!-- Star Canvas Background -->
+  <canvas id="starCanvas" class="absolute inset-0 pointer-events-none z-0"></canvas>
+
+  <!-- Top Navigation & Title Bar -->
+  <header class="relative z-20 pt-4 px-4 sm:px-8 flex flex-col items-center">
+    
+    <!-- Action buttons (Top Bar) -->
+    <div class="w-full max-w-6xl flex justify-between items-center mb-2">
+      <!-- Status Badge -->
+      <div class="flex items-center gap-2 bg-indigo-950/70 border border-purple-500/40 rounded-full px-4 py-1.5 shadow-lg backdrop-blur-md">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+        <span class="text-xs sm:text-sm font-semibold text-purple-200">
+          Còn lại: <strong id="cardsLeftCount" class="text-pink-400 text-base">8</strong> thẻ
+        </span>
+      </div>
+
+      <!-- Quick Controls -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- History List Button -->
+        <button id="btnHistory" class="px-3 py-1.5 rounded-full bg-purple-900/60 hover:bg-purple-800/80 border border-purple-400/30 text-xs sm:text-sm text-purple-200 transition shadow flex items-center gap-1.5 hover:scale-105 active:scale-95">
+          <span>📜</span>
+          <span class="hidden sm:inline">Lịch sử</span>
+        </button>
+
+        <!-- Sound Toggle -->
+        <button id="btnSoundToggle" class="p-2 sm:px-3 sm:py-1.5 rounded-full bg-purple-900/60 hover:bg-purple-800/80 border border-purple-400/30 text-xs sm:text-sm text-yellow-300 transition shadow flex items-center gap-1 hover:scale-105 active:scale-95">
+          <span id="soundIcon">🔊</span>
+        </button>
+
+        <!-- Teacher Settings Button -->
+        <button id="btnSettings" class="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-400 hover:to-pink-400 text-white text-xs sm:text-sm font-bold shadow-lg shadow-pink-500/25 flex items-center gap-1.5 transition hover:scale-105 active:scale-95">
+          <span>⚙️</span>
+          <span>Cài Đặt Thẻ</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN GAME TITLE BANNER (Match Attached Image) -->
+    <div class="relative mt-1 group">
+      <div class="absolute -inset-1 bg-gradient-to-r from-pink-500 via-rose-400 to-amber-400 rounded-full blur-md opacity-75 group-hover:opacity-100 transition duration-500"></div>
+      <div class="relative px-6 sm:px-12 py-2.5 sm:py-3.5 bg-gradient-to-r from-[#ff5e7e] via-[#ff758c] to-[#ff9874] rounded-full border-2 border-white/90 shadow-[0_8px_30px_rgba(255,94,126,0.6)] flex items-center gap-2 sm:gap-4">
+        <span class="text-xl sm:text-3xl text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] transform -rotate-12 animate-bounce">⭐</span>
+        <h1 class="font-title text-base sm:text-2xl md:text-3xl font-extrabold tracking-wider text-white uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] text-center">
+          THẺ ĐẶC QUYỀN LINH THÚ 3D
+        </h1>
+        <span class="text-xl sm:text-3xl text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] transform rotate-12 animate-bounce">⭐</span>
+      </div>
+    </div>
+    <p class="text-xs sm:text-sm text-purple-300/80 mt-1.5 font-medium tracking-wide">
+      Vòng quay linh thú may mắn dành cho các bạn học sinh chăm ngoan!
+    </p>
+  </header>
+
+  <!-- 3D Orbit Playground Area -->
+  <main class="relative flex-1 w-full max-w-6xl mx-auto flex items-center justify-center scene-viewport px-2">
+    <!-- Oval Orbit Path Outline (Decorative faint ring) -->
+    <div class="absolute w-[86%] sm:w-[82%] h-[46%] sm:h-[52%] rounded-[50%] border-2 border-dashed border-pink-500/20 pointer-events-none transform -rotate-x-[25deg] shadow-[0_0_50px_rgba(236,72,153,0.1)]"></div>
+
+    <!-- Orbit Container for 3D Cards -->
+    <div id="orbitStage" class="orbit-container">
+      <!-- Cards will be dynamically injected here -->
+    </div>
+
+    <!-- Empty Notification (when all cards eliminated) -->
+    <div id="emptyNotice" class="hidden absolute flex flex-col items-center justify-center bg-purple-950/80 border border-pink-500/40 rounded-3xl p-8 backdrop-blur-xl text-center max-w-md shadow-2xl">
+      <span class="text-5xl mb-3">🎉</span>
+      <h3 class="text-2xl font-bold text-pink-300 font-title mb-2">ĐÃ HẾT THẺ THƯỞNG!</h3>
+      <p class="text-sm text-purple-200 mb-6">Tất cả linh thú may mắn đã được trao tặng cho các em học sinh.</p>
+      <button id="btnResetCards" class="px-6 py-2.5 rounded-full bg-gradient-to-r from-pink-500 to-indigo-600 font-bold hover:scale-105 active:scale-95 transition shadow-lg shadow-pink-500/40">
+        🔄 Tải lại toàn bộ thẻ
+      </button>
+    </div>
+  </main>
+
+  <!-- Bottom Control Bar -->
+  <footer class="relative z-20 pb-6 sm:pb-8 pt-2 flex flex-col items-center gap-3">
+    <!-- Shuffle & Spin Button -->
+    <button id="btnShuffle" class="relative group cursor-pointer focus:outline-none">
+      <div class="absolute -inset-1.5 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 rounded-full blur-lg opacity-80 group-hover:opacity-100 transition duration-300 group-hover:scale-105 animate-pulse"></div>
+      <div class="relative px-8 sm:px-14 py-3.5 sm:py-4 bg-gradient-to-r from-rose-500 via-pink-600 to-purple-600 rounded-full border-2 border-white/80 shadow-[0_10px_35px_rgba(244,63,94,0.6)] flex items-center gap-3 transform group-hover:-translate-y-0.5 active:translate-y-1 transition duration-150">
+        <span class="text-2xl sm:text-3xl animate-spin" style="animation-duration: 4s;">🌀</span>
+        <span class="font-title text-base sm:text-xl font-bold tracking-wider text-white uppercase drop-shadow">
+          XÁO THẺ & QUAY THƯỞNG
+        </span>
+      </div>
+    </button>
+    <div class="text-xs text-purple-300/70 font-medium">
+      Nhấn để xáo trộn thẻ và tự động chọn ra linh thú đặc quyền ngẫu nhiên
+    </div>
+  </footer>
+
+  <!-- ==================== MODAL CHÚC MỪNG PHẦN THƯỞNG (POPUP) ==================== -->
+  <div id="rewardModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden transition-opacity duration-300 opacity-0">
+    <!-- Sunburst Golden Background -->
+    <div class="absolute w-[600px] h-[600px] pointer-events-none sunburst opacity-30">
+      <svg viewBox="0 0 100 100" class="w-full h-full fill-yellow-400">
+        <path d="M50 50 L45 0 L55 0 Z"/>
+        <path d="M50 50 L75 5 L85 15 Z"/>
+        <path d="M50 50 L95 40 L100 50 L95 60 Z"/>
+        <path d="M50 50 L85 85 L75 95 Z"/>
+        <path d="M50 50 L55 100 L45 100 Z"/>
+        <path d="M50 50 L15 85 L5 75 Z"/>
+        <path d="M50 50 L5 60 L0 50 L5 40 Z"/>
+        <path d="M50 50 L5 15 L15 5 Z"/>
+      </svg>
+    </div>
+
+    <div class="relative w-full max-w-sm sm:max-w-md bg-gradient-to-b from-[#2e1065] via-[#1e1b4b] to-[#0f172a] rounded-3xl border-2 border-pink-400/80 p-6 sm:p-8 text-center glow-pulse shadow-2xl flex flex-col items-center">
+      <div class="text-xs uppercase tracking-widest text-amber-300 font-extrabold mb-1">
+        ✨ CHÚC MỪNG HỌC SINH MAY MẮN ✨
+      </div>
+      
+      <!-- Big Animal Avatar -->
+      <div class="relative my-3">
+        <div class="absolute -inset-3 bg-pink-500 rounded-full blur-xl opacity-70 animate-pulse"></div>
+        <div id="rewardAvatar" class="relative w-28 h-28 sm:w-32 sm:h-32 rounded-3xl bg-gradient-to-br from-pink-400 via-purple-400 to-indigo-500 p-1 shadow-inner border-2 border-white flex items-center justify-center text-6xl sm:text-7xl">
+          🦄
+        </div>
+      </div>
+
+      <!-- Mascot Name & Card Number -->
+      <h3 id="rewardMascotName" class="text-xl sm:text-2xl font-black text-pink-300 font-title mb-1 drop-shadow">
+        Kỳ Lân Mộng Mơ
+      </h3>
+      <span id="rewardCardNumber" class="text-xs px-3 py-1 bg-white/10 rounded-full border border-pink-300/40 text-purple-200 mb-4 font-semibold">
+        Thẻ số 3
+      </span>
+
+      <!-- Privilege Reward Box -->
+      <div class="w-full bg-gradient-to-r from-amber-500/20 via-pink-500/20 to-purple-500/20 border-2 border-amber-400/80 rounded-2xl p-4 mb-6 shadow-inner">
+        <p class="text-xs text-amber-300 font-bold uppercase tracking-wider mb-1">🎁 ĐẶC QUYỀN NHẬN ĐƯỢC:</p>
+        <div id="rewardText" class="text-lg sm:text-2xl font-black text-amber-200 font-title leading-snug">
+          Cộng 10 Điểm Miệng
+        </div>
+      </div>
+
+      <!-- Elimination Notice -->
+      <p class="text-xs text-purple-300/70 mb-5 italic">
+        💡 Sau khi nhận thưởng, linh thú này sẽ tự động tiêu biến (Eliminate) để nhường cơ hội cho các bạn khác!
+      </p>
+
+      <!-- Dismiss / Eliminate Button -->
+      <button id="btnClaimReward" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white font-extrabold text-base shadow-[0_4px_20px_rgba(20,184,166,0.5)] transition hover:scale-[1.02] active:scale-95">
+        🎉 NHẬN THƯỞNG & TIÊU BIẾN THẺ
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL CÀI ĐẶT CỦA GIÁO VIÊN ==================== -->
+  <div id="settingsModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md hidden transition-opacity duration-200">
+    <div class="relative w-full max-w-2xl bg-[#17102b] border border-purple-500/50 rounded-3xl shadow-2xl p-5 sm:p-7 max-h-[90vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex justify-between items-center border-b border-purple-500/30 pb-4 mb-4">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">⚙️</span>
+          <div>
+            <h2 class="text-lg sm:text-xl font-bold font-title text-pink-300">Cài Đặt Thẻ & Quà Tặng (Giáo Viên)</h2>
+            <p class="text-xs text-purple-300">Tùy chỉnh danh sách linh thú và phần quà đặc quyền cho học sinh</p>
+          </div>
+        </div>
+        <button id="btnCloseSettings" class="w-8 h-8 rounded-full bg-purple-900/60 hover:bg-purple-800 text-purple-300 hover:text-white flex items-center justify-center transition">
+          ✕
+        </button>
+      </div>
+
+      <!-- Add New Card Form -->
+      <div class="bg-purple-950/40 p-3.5 rounded-2xl border border-purple-500/30 mb-4">
+        <div class="text-xs font-bold text-amber-300 mb-2 uppercase">➕ Thêm thẻ linh thú mới</div>
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 text-sm">
+          <div class="sm:col-span-2">
+            <input id="inputIcon" type="text" placeholder="Icon" value="🦊" maxlength="4" class="w-full text-center text-xl bg-purple-900/60 border border-purple-500/40 rounded-xl px-2 py-1.5 focus:outline-none focus:border-pink-400 text-white">
+          </div>
+          <div class="sm:col-span-4">
+            <input id="inputName" type="text" placeholder="Tên linh thú (VD: Cáo Thông Thái)" class="w-full bg-purple-900/60 border border-purple-500/40 rounded-xl px-3 py-2 focus:outline-none focus:border-pink-400 text-white placeholder-purple-400/50 text-xs sm:text-sm">
+          </div>
+          <div class="sm:col-span-4">
+            <input id="inputReward" type="text" placeholder="Phần thưởng (VD: Bút chì 2B)" class="w-full bg-purple-900/60 border border-purple-500/40 rounded-xl px-3 py-2 focus:outline-none focus:border-pink-400 text-white placeholder-purple-400/50 text-xs sm:text-sm">
+          </div>
+          <div class="sm:col-span-2">
+            <button id="btnAddCard" class="w-full h-full py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 rounded-xl font-bold text-xs uppercase transition shadow">
+              Thêm
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Table List -->
+      <div class="flex-1 overflow-y-auto pr-1 space-y-2 mb-4" id="cardsEditList">
+        <!-- Injected dynamically -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-purple-500/30 text-xs">
+        <div class="flex items-center gap-2">
+          <button id="btnRestoreDefault" class="px-3 py-2 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-300 hover:text-white transition">
+            🔄 Khôi phục mặc định
+          </button>
+          <button id="btnResetAllPlaying" class="px-3 py-2 rounded-xl bg-indigo-900/70 hover:bg-indigo-800 text-cyan-300 font-semibold transition">
+            ♻️ Tải lại vòng chơi
+          </button>
+        </div>
+        <button id="btnSaveClose" class="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 font-bold text-white shadow-lg transition">
+          Xong & Áp Dụng
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL LỊCH SỬ NHẬN THƯỞNG ==================== -->
+  <div id="historyModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden transition-opacity duration-200">
+    <div class="relative w-full max-w-md bg-[#181130] border border-purple-500/50 rounded-3xl p-6 shadow-2xl flex flex-col max-h-[80vh]">
+      <div class="flex justify-between items-center border-b border-purple-500/30 pb-3 mb-4">
+        <h3 class="text-lg font-bold font-title text-pink-300 flex items-center gap-2">
+          <span>📜</span> Lịch Sử Tặng Thưởng
+        </h3>
+        <button id="btnCloseHistory" class="w-8 h-8 rounded-full bg-purple-900/60 hover:bg-purple-800 text-purple-300 hover:text-white flex items-center justify-center transition">
+          ✕
+        </button>
+      </div>
+      
+      <div id="historyList" class="flex-1 overflow-y-auto space-y-2 text-sm">
+        <!-- History items dynamically rendered -->
+      </div>
+
+      <div class="pt-3 border-t border-purple-500/30 mt-3 flex justify-between">
+        <button id="btnClearHistory" class="text-xs text-rose-400 hover:text-rose-300 hover:underline">
+          Xóa lịch sử
+        </button>
+        <button id="btnCloseHistory2" class="px-4 py-1.5 rounded-xl bg-purple-800 hover:bg-purple-700 text-xs font-semibold">
+          Đóng
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ====================================================================
+       1. SYNTHESIZED SOUND SYSTEM (Web Audio API) - No External Audio Needed
+       ==================================================================== */
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTick() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(500 + Math.random() * 200, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.04);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.04);
+      }
+
+      playCardWhoosh() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.01, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.18, this.ctx.currentTime + 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.25);
+      }
+
+      playVictory() {
+        if (!this.enabled) return;
+        this.init();
+        // Play melodic arpeggio C5, E5, G5, C6
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const startTime = this.ctx.currentTime + idx * 0.1;
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, startTime);
+          gain.gain.setValueAtTime(0.2, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.6);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + 0.65);
+        });
+      }
+
+      playElimination() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.55);
+      }
+    }
+    const sound = new SoundEngine();
+
+    /* ====================================================================
+       2. DEFAULT CARDS DATA (Matching the provided classroom reference image)
+       ==================================================================== */
+    const DEFAULT_CARDS = [
+      { id: 1, name: "Gấu Trúc 3D", icon: "🐼", reward: "Tặng 1 Điểm Cộng Miệng", num: 1 },
+      { id: 2, name: "Mèo Thần Tài 3D", icon: "🐱", reward: "Ngồi Cùng Bạn Thân 1 Buổi", num: 2 },
+      { id: 3, name: "Kỳ Lân Mộng Mơ", icon: "🦄", reward: "Thoát 1 Lần Kiểm Tra Bài Cũ", num: 3 },
+      { id: 4, name: "Rồng Con May Mắn", icon: "🐲", reward: "Một Món Quà Bánh Kẹo", num: 4 },
+      { id: 5, name: "Khủng Long Ti Nị", icon: "🦕", reward: "Làm Nhóm Trưởng Quyền Lực", num: 5 },
+      { id: 6, name: "Cún Corgi Vui Vẻ", icon: "🐶", reward: "Cả Lớp Vỗ Tay Khen Ngợi", num: 6 },
+      { id: 7, name: "Thỏ Bảy Màu 3D", icon: "🐰", reward: "Sticker Ngôi Sao Xuất Sắc", num: 7 },
+      { id: 8, name: "Chim Cánh Cụt Cute", icon: "🐧", reward: "Được Quyền Chọn Bài Hát Giải Lao", num: 8 }
+    ];
+
+    // Master list in localStorage
+    let masterCards = [];
+    // Currently active cards on the orbit
+    let activeCards = [];
+    // Rewarded history
+    let rewardHistory = [];
+
+    // Storage Keys
+    const STORAGE_KEY = 'linh_thu_cards_v1';
+    const HISTORY_KEY = 'linh_thu_history_v1';
+
+    function loadMasterData() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          masterCards = JSON.parse(saved);
+        } else {
+          masterCards = JSON.parse(JSON.stringify(DEFAULT_CARDS));
+          saveMasterData();
+        }
+      } catch (e) {
+        masterCards = JSON.parse(JSON.stringify(DEFAULT_CARDS));
+      }
+
+      try {
+        const hSaved = localStorage.getItem(HISTORY_KEY);
+        rewardHistory = hSaved ? JSON.parse(hSaved) : [];
+      } catch (e) {
+        rewardHistory = [];
+      }
+      
+      // Clone to active cards
+      activeCards = JSON.parse(JSON.stringify(masterCards));
+    }
+
+    function saveMasterData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(masterCards));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function saveHistory() {
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(rewardHistory));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    /* ====================================================================
+       3. 3D ELLIPTICAL CAROUSEL MATH & POSITIONING
+       ==================================================================== */
+    const stage = document.getElementById('orbitStage');
+    let currentOrbitAngle = 0; // Current base rotation angle (radians)
+    let isSpinning = false;
+    let selectedPickedCard = null;
+
+    // Responsive radii for the ellipse
+    function getRadii() {
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      // Ellipse Horizontal & Vertical Radius
+      const rx = Math.min(w * 0.44, 460);
+      const ry = Math.min(h * 0.36, 175);
+      return { rx, ry };
+    }
+
+    // Render cards into the orbit
+    function renderOrbit() {
+      stage.innerHTML = '';
+      const total = activeCards.length;
+      document.getElementById('cardsLeftCount').textContent = total;
+
+      if (total === 0) {
+        document.getElementById('emptyNotice').classList.remove('hidden');
+        return;
+      } else {
+        document.getElementById('emptyNotice').classList.add('hidden');
+      }
+
+      const { rx, ry } = getRadii();
+
+      activeCards.forEach((card, i) => {
+        // Distribute cards equally along 2*PI
+        const angle = currentOrbitAngle + (i * (2 * Math.PI / total));
+        
+        // Elliptical coordinates
+        const x = rx * Math.cos(angle);
+        const y = ry * Math.sin(angle);
+
+        // Depth perspective (cards at bottom have sin(angle) > 0, are closer)
+        // sin = -1 (top, back) -> sin = +1 (bottom, front)
+        const depthNorm = (Math.sin(angle) + 1) / 2; // 0 (far) to 1 (near)
+        const scale = 0.72 + depthNorm * 0.38; // scale from 0.72 to 1.10
+        const zIndex = Math.round(depthNorm * 100);
+        const opacity = 0.65 + depthNorm * 0.35;
+        const brightness = 0.8 + depthNorm * 0.25;
+
+        // Create Card Element
+        const cardWrapper = document.createElement('div');
+        cardWrapper.className = 'card-3d-wrapper';
+        cardWrapper.id = `card-node-${card.id}`;
+        cardWrapper.setAttribute('data-id', card.id);
+
+        cardWrapper.style.transform = `translate3d(${x}px, ${y}px, 0px) scale(${scale})`;
+        cardWrapper.style.zIndex = zIndex;
+        cardWrapper.style.opacity = opacity;
+        cardWrapper.style.filter = `brightness(${brightness})`;
+
+        // Card Inner HTML: Front & Back with Mascot details
+        cardWrapper.innerHTML = `
+          <div class="card-flipper">
+            <!-- FRONT SIDE (Mascot Show) -->
+            <div class="card-face card-front p-3 flex flex-col items-center justify-between text-center select-none overflow-hidden">
+              <div class="w-full flex justify-between items-center text-[10px] text-pink-100/90 font-bold px-1">
+                <span>✦ 3D</span>
+                <span class="text-yellow-300">★ ★ ★</span>
+              </div>
+              
+              <!-- 3D Animal Avatar Floating -->
+              <div class="my-auto transform transition duration-300 hover:scale-110 flex flex-col items-center">
+                <div class="text-5xl sm:text-6xl drop-shadow-[0_8px_12px_rgba(0,0,0,0.4)] animate-bounce" style="animation-duration: ${2.5 + (i % 3) * 0.5}s;">
+                  ${card.icon}
+                </div>
+              </div>
+
+              <!-- Title & Tag matching image -->
+              <div class="w-full flex flex-col items-center gap-1.5 pb-1">
+                <div class="text-xs sm:text-sm font-extrabold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] leading-tight px-1 line-clamp-1">
+                  ${card.name}
+                </div>
+                <!-- Number pill exactly like sample image -->
+                <div class="bg-white/90 text-rose-500 font-extrabold text-[11px] sm:text-xs px-3.5 py-0.5 rounded-full shadow-md border border-rose-300/60">
+                  Thẻ số ${card.num || (i + 1)}
+                </div>
+              </div>
+            </div>
+
+            <!-- BACK SIDE (Mystery Deck) -->
+            <div class="card-face card-back p-4 flex flex-col items-center justify-between text-center border-2 border-amber-300/70">
+              <div class="text-xs text-amber-300 font-extrabold tracking-widest">★ MAGIC ★</div>
+              <div class="flex flex-col items-center">
+                <div class="w-16 h-16 rounded-full border-2 border-dashed border-amber-300/80 flex items-center justify-center bg-purple-900/40 text-3xl shadow-inner">
+                  🔮
+                </div>
+                <div class="text-xs font-bold text-pink-200 mt-2">BÍ MẬT</div>
+              </div>
+              <div class="text-[10px] text-amber-200/80 font-medium tracking-wider uppercase">Đặc Quyền 3D</div>
+            </div>
+          </div>
+        `;
+
+        // Card Click Handler (Manual click to pick if not spinning)
+        cardWrapper.addEventListener('click', () => {
+          if (!isSpinning) {
+            selectCardDirectly(card);
+          }
+        });
+
+        stage.appendChild(cardWrapper);
+      });
+    }
+
+    // Update positions during animation without re-creating DOM
+    function updateOrbitPositions() {
+      const total = activeCards.length;
+      if (total === 0) return;
+      const { rx, ry } = getRadii();
+
+      activeCards.forEach((card, i) => {
+        const cardNode = document.getElementById(`card-node-${card.id}`);
+        if (!cardNode) return;
+
+        const angle = currentOrbitAngle + (i * (2 * Math.PI / total));
+        const x = rx * Math.cos(angle);
+        const y = ry * Math.sin(angle);
+
+        const depthNorm = (Math.sin(angle) + 1) / 2;
+        const scale = 0.72 + depthNorm * 0.38;
+        const zIndex = Math.round(depthNorm * 100);
+        const opacity = 0.65 + depthNorm * 0.35;
+        const brightness = 0.8 + depthNorm * 0.25;
+
+        cardNode.style.transform = `translate3d(${x}px, ${y}px, 0px) scale(${scale})`;
+        cardNode.style.zIndex = zIndex;
+        cardNode.style.opacity = opacity;
+        cardNode.style.filter = `brightness(${brightness})`;
+      });
+    }
+
+    // Resize handling to keep ellipse centered & scaled
+    window.addEventListener('resize', () => {
+      updateOrbitPositions();
+    });
+
+    /* ====================================================================
+       4. SHUFFLE, SPINNING & AUTOMATIC SELECTION LOGIC
+       ==================================================================== */
+    const btnShuffle = document.getElementById('btnShuffle');
+
+    btnShuffle.addEventListener('click', () => {
+      if (isSpinning || activeCards.length === 0) return;
+      startShuffleAndPick();
+    });
+
+    function startShuffleAndPick() {
+      isSpinning = true;
+      btnShuffle.classList.add('opacity-50', 'pointer-events-none');
+
+      // 1. Flip all cards to mystery backs first
+      const flippers = document.querySelectorAll('.card-flipper');
+      flippers.forEach(f => f.classList.add('flipped'));
+      sound.playCardWhoosh();
+
+      // 2. Pick a random winner in advance
+      const winnerIndex = Math.floor(Math.random() * activeCards.length);
+      const winnerCard = activeCards[winnerIndex];
+      selectedPickedCard = winnerCard;
+
+      // Calculate target angle so winner ends at front-center:
+      // Front-center is angle = Math.PI / 2 (sin(PI/2) = 1, cos(PI/2) = 0)
+      // Angle for index i is: targetAngle + (i * (2*PI / total)) = PI/2
+      // => targetAngle = PI/2 - (i * (2*PI / total))
+      const total = activeCards.length;
+      const desiredFrontAngle = Math.PI / 2;
+      const targetBaseAngle = desiredFrontAngle - (winnerIndex * (2 * Math.PI / total));
+
+      // Add 4 to 6 full spins (rotations) for dramatic carousel spinning
+      const extraSpins = 4 + Math.floor(Math.random() * 2); 
+      // Compute total delta angle
+      let deltaAngle = (targetBaseAngle - (currentOrbitAngle % (2 * Math.PI)));
+      while (deltaAngle < 0) {
+        deltaAngle += 2 * Math.PI;
+      }
+      const finalTargetAngle = currentOrbitAngle + deltaAngle + (extraSpins * 2 * Math.PI);
+
+      const startTime = performance.now();
+      const duration = 4200; // 4.2 seconds smooth spinning
+      const initialAngle = currentOrbitAngle;
+      let lastTickAngle = initialAngle;
+
+      function animateSpin(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Quintic Easing Out for ultra-smooth deceleration
+        // easeOutQuint = 1 - pow(1 - t, 5)
+        const ease = 1 - Math.pow(1 - progress, 4.5);
+
+        currentOrbitAngle = initialAngle + (finalTargetAngle - initialAngle) * ease;
+        updateOrbitPositions();
+
+        // Audio tick when passing cards
+        if (Math.abs(currentOrbitAngle - lastTickAngle) > 0.45) {
+          sound.playTick();
+          lastTickAngle = currentOrbitAngle;
+        }
+
+        if (progress < 1) {
+          requestAnimationFrame(animateSpin);
+        } else {
+          // Finished spinning
+          currentOrbitAngle = finalTargetAngle;
+          updateOrbitPositions();
+          triggerWinnerReveal(winnerCard);
+        }
+      }
+
+      requestAnimationFrame(animateSpin);
+    }
+
+    // Manual direct pick when user taps a card
+    function selectCardDirectly(card) {
+      if (isSpinning) return;
+      isSpinning = true;
+      btnShuffle.classList.add('opacity-50', 'pointer-events-none');
+      selectedPickedCard = card;
+      triggerWinnerReveal(card);
+    }
+
+    /* ====================================================================
+       5. CARD ZOOM, REVEAL, CONFETTI & REWARD POPUP
+       ==================================================================== */
+    function triggerWinnerReveal(card) {
+      const cardNode = document.getElementById(`card-node-${card.id}`);
+      if (!cardNode) {
+        isSpinning = false;
+        btnShuffle.classList.remove('opacity-50', 'pointer-events-none');
+        return;
+      }
+
+      // Bring selected card to dead-center, scale up, maximum z-index
+      cardNode.style.transition = 'all 0.9s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      cardNode.style.zIndex = '999';
+      cardNode.style.transform = 'translate3d(0px, 0px, 0px) scale(1.45)';
+      cardNode.style.opacity = '1';
+      cardNode.style.filter = 'brightness(1.2) drop-shadow(0 0 35px #f472b6)';
+
+      sound.playCardWhoosh();
+
+      // Flip card to reveal front
+      setTimeout(() => {
+        const flipper = cardNode.querySelector('.card-flipper');
+        if (flipper) {
+          flipper.classList.remove('flipped');
+        }
+      }, 500);
+
+      // Fire confetti & Victory Chime
+      setTimeout(() => {
+        sound.playVictory();
+        fireConfettiBurst();
+        showRewardModal(card);
+      }, 1200);
+    }
+
+    function fireConfettiBurst() {
+      try {
+        confetti({
+          particleCount: 90,
+          spread: 75,
+          origin: { y: 0.6 }
+        });
+        setTimeout(() => {
+          confetti({
+            particleCount: 50,
+            angle: 60,
+            spread: 60,
+            origin: { x: 0.1, y: 0.7 }
+          });
+          confetti({
+            particleCount: 50,
+            angle: 120,
+            spread: 60,
+            origin: { x: 0.9, y: 0.7 }
+          });
+        }, 250);
+      } catch (e) {
+        console.log(e);
+      }
+    }
+
+    /* ====================================================================
+       6. REWARD MODAL & 3D ELIMINATION LOGIC
+       ==================================================================== */
+    const rewardModal = document.getElementById('rewardModal');
+    const rewardAvatar = document.getElementById('rewardAvatar');
+    const rewardMascotName = document.getElementById('rewardMascotName');
+    const rewardCardNumber = document.getElementById('rewardCardNumber');
+    const rewardText = document.getElementById('rewardText');
+    const btnClaimReward = document.getElementById('btnClaimReward');
+
+    function showRewardModal(card) {
+      rewardAvatar.textContent = card.icon;
+      rewardMascotName.textContent = card.name;
+      rewardCardNumber.textContent = `Thẻ số ${card.num || ''}`;
+      rewardText.textContent = card.reward;
+
+      rewardModal.classList.remove('hidden');
+      setTimeout(() => {
+        rewardModal.classList.remove('opacity-0');
+      }, 20);
+
+      // Save to History
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      rewardHistory.unshift({
+        name: card.name,
+        icon: card.icon,
+        reward: card.reward,
+        time: timeStr
+      });
+      saveHistory();
+    }
+
+    function closeRewardModalAndEliminate() {
+      rewardModal.classList.add('opacity-0');
+      setTimeout(() => {
+        rewardModal.classList.add('hidden');
+        executeCardElimination(selectedPickedCard);
+      }, 300);
+    }
+
+    btnClaimReward.addEventListener('click', () => {
+      closeRewardModalAndEliminate();
+    });
+
+    // 3D ELIMINATION OF SELECTED CARD
+    function executeCardElimination(card) {
+      if (!card) return;
+      const cardNode = document.getElementById(`card-node-${card.id}`);
+      sound.playElimination();
+
+      if (cardNode) {
+        // Trigger explosion/dust animation
+        cardNode.classList.add('eliminating');
+
+        // Optional: spark confetti burst on spot
+        try {
+          confetti({
+            particleCount: 40,
+            spread: 120,
+            ticks: 150,
+            origin: { y: 0.5, x: 0.5 }
+          });
+        } catch(e){}
+
+        setTimeout(() => {
+          // Remove from activeCards list
+          activeCards = activeCards.filter(c => c.id !== card.id);
+          // Re-render remaining orbit smoothly
+          renderOrbit();
+          isSpinning = false;
+          btnShuffle.classList.remove('opacity-50', 'pointer-events-none');
+          selectedPickedCard = null;
+        }, 1100);
+      } else {
+        activeCards = activeCards.filter(c => c.id !== card.id);
+        renderOrbit();
+        isSpinning = false;
+        btnShuffle.classList.remove('opacity-50', 'pointer-events-none');
+      }
+    }
+
+    // Reset all cards button when empty or manual
+    document.getElementById('btnResetCards').addEventListener('click', resetAllPlayingCards);
+
+    function resetAllPlayingCards() {
+      activeCards = JSON.parse(JSON.stringify(masterCards));
+      currentOrbitAngle = 0;
+      renderOrbit();
+    }
+
+    /* ====================================================================
+       7. TEACHER SETTINGS MODAL (Customization & Management)
+       ==================================================================== */
+    const settingsModal = document.getElementById('settingsModal');
+    const btnSettings = document.getElementById('btnSettings');
+    const btnCloseSettings = document.getElementById('btnCloseSettings');
+    const btnSaveClose = document.getElementById('btnSaveClose');
+    const cardsEditList = document.getElementById('cardsEditList');
+
+    const inputIcon = document.getElementById('inputIcon');
+    const inputName = document.getElementById('inputName');
+    const inputReward = document.getElementById('inputReward');
+    const btnAddCard = document.getElementById('btnAddCard');
+    const btnRestoreDefault = document.getElementById('btnRestoreDefault');
+    const btnResetAllPlaying = document.getElementById('btnResetAllPlaying');
+
+    btnSettings.addEventListener('click', () => {
+      sound.init();
+      renderTeacherCardsList();
+      settingsModal.classList.remove('hidden');
+    });
+
+    function closeSettings() {
+      settingsModal.classList.add('hidden');
+      saveMasterData();
+      // Sync active cards with new master definitions
+      syncActiveCardsWithMaster();
+      renderOrbit();
+    }
+
+    btnCloseSettings.addEventListener('click', closeSettings);
+    btnSaveClose.addEventListener('click', closeSettings);
+
+    function syncActiveCardsWithMaster() {
+      // Keep cards that exist in master, add any new ones
+      const masterIds = new Set(masterCards.map(c => c.id));
+      activeCards = activeCards.filter(c => masterIds.has(c.id));
+      
+      // Update data of existing
+      activeCards.forEach(ac => {
+        const found = masterCards.find(m => m.id === ac.id);
+        if (found) {
+          ac.name = found.name;
+          ac.icon = found.icon;
+          ac.reward = found.reward;
+          ac.num = found.num;
+        }
+      });
+
+      // If activeCards is empty, load all master
+      if (activeCards.length === 0 && masterCards.length > 0) {
+        activeCards = JSON.parse(JSON.stringify(masterCards));
+      }
+    }
+
+    function renderTeacherCardsList() {
+      cardsEditList.innerHTML = '';
+      masterCards.forEach((c, idx) => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between gap-2 p-2.5 bg-purple-950/60 border border-purple-500/20 rounded-xl text-xs sm:text-sm';
+        item.innerHTML = `
+          <div class="flex items-center gap-2.5 flex-1 min-w-0">
+            <span class="text-2xl">${c.icon}</span>
+            <div class="truncate">
+              <div class="font-bold text-pink-300 truncate">${c.name} <span class="text-purple-400 font-normal">(Thẻ #${c.num || idx + 1})</span></div>
+              <div class="text-amber-200 text-xs truncate">🎁 ${c.reward}</div>
+            </div>
+          </div>
+          <button class="btn-del-card px-2.5 py-1.5 rounded-lg bg-rose-900/60 hover:bg-rose-700 text-rose-200 transition text-xs font-semibold" data-id="${c.id}">
+            Xóa
+          </button>
+        `;
+        cardsEditList.appendChild(item);
+      });
+
+      // Bind delete events
+      document.querySelectorAll('.btn-del-card').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = parseInt(e.currentTarget.getAttribute('data-id'));
+          masterCards = masterCards.filter(c => c.id !== id);
+          saveMasterData();
+          renderTeacherCardsList();
+        });
+      });
+    }
+
+    // Add card
+    btnAddCard.addEventListener('click', () => {
+      const icon = inputIcon.value.trim() || '⭐';
+      const name = inputName.value.trim();
+      const reward = inputReward.value.trim();
+
+      if (!name || !reward) {
+        alertTeacherNotice("Vui lòng điền đủ Tên linh thú và Phần thưởng!");
+        return;
+      }
+
+      const newId = Date.now();
+      const newNum = masterCards.length + 1;
+      masterCards.push({
+        id: newId,
+        icon: icon,
+        name: name,
+        reward: reward,
+        num: newNum
+      });
+
+      // Reset inputs
+      inputName.value = '';
+      inputReward.value = '';
+      inputIcon.value = '🦊';
+
+      saveMasterData();
+      renderTeacherCardsList();
+    });
+
+    // Restore Default
+    btnRestoreDefault.addEventListener('click', () => {
+      masterCards = JSON.parse(JSON.stringify(DEFAULT_CARDS));
+      saveMasterData();
+      renderTeacherCardsList();
+    });
+
+    // Reset All Playing
+    btnResetAllPlaying.addEventListener('click', () => {
+      resetAllPlayingCards();
+      closeSettings();
+    });
+
+    /* ====================================================================
+       8. HISTORY MODAL LOGIC
+       ==================================================================== */
+    const historyModal = document.getElementById('historyModal');
+    const btnHistory = document.getElementById('btnHistory');
+    const btnCloseHistory = document.getElementById('btnCloseHistory');
+    const btnCloseHistory2 = document.getElementById('btnCloseHistory2');
+    const historyList = document.getElementById('historyList');
+    const btnClearHistory = document.getElementById('btnClearHistory');
+
+    btnHistory.addEventListener('click', () => {
+      renderHistoryList();
+      historyModal.classList.remove('hidden');
+    });
+
+    function closeHistoryModal() {
+      historyModal.classList.add('hidden');
+    }
+    btnCloseHistory.addEventListener('click', closeHistoryModal);
+    btnCloseHistory2.addEventListener('click', closeHistoryModal);
+
+    btnClearHistory.addEventListener('click', () => {
+      rewardHistory = [];
+      saveHistory();
+      renderHistoryList();
+    });
+
+    function renderHistoryList() {
+      historyList.innerHTML = '';
+      if (rewardHistory.length === 0) {
+        historyList.innerHTML = `<div class="text-center text-purple-400 py-8 text-xs italic">Chưa có phần thưởng nào được bốc trong buổi học hôm nay.</div>`;
+        return;
+      }
+
+      rewardHistory.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-2.5 rounded-xl bg-purple-900/30 border border-purple-500/20 text-xs';
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">${item.icon}</span>
+            <div>
+              <div class="font-bold text-pink-300">${item.name}</div>
+              <div class="text-amber-200">🎁 ${item.reward}</div>
+            </div>
+          </div>
+          <span class="text-[10px] text-purple-400 font-semibold">${item.time}</span>
+        `;
+        historyList.appendChild(row);
+      });
+    }
+
+    /* ====================================================================
+       9. SOUND TOGGLE & INLINE NOTIFICATION
+       ==================================================================== */
+    const btnSoundToggle = document.getElementById('btnSoundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+
+    btnSoundToggle.addEventListener('click', () => {
+      sound.enabled = !sound.enabled;
+      soundIcon.textContent = sound.enabled ? '🔊' : '🔇';
+    });
+
+    function alertTeacherNotice(msg) {
+      // Soft custom floating toast
+      const toast = document.createElement('div');
+      toast.className = 'fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-rose-600 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-full shadow-2xl transition-all duration-300';
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 400);
+      }, 2500);
+    }
+
+    /* ====================================================================
+       10. STARFIELD BACKGROUND ANIMATION
+       ==================================================================== */
+    const starCanvas = document.getElementById('starCanvas');
+    const ctx = starCanvas.getContext('2d');
+    let stars = [];
+
+    function resizeStarCanvas() {
+      starCanvas.width = window.innerWidth;
+      starCanvas.height = window.innerHeight;
+      initStars();
+    }
+
+    function initStars() {
+      stars = [];
+      const numStars = Math.floor((window.innerWidth * window.innerHeight) / 9000);
+      for (let i = 0; i < numStars; i++) {
+        stars.push({
+          x: Math.random() * starCanvas.width,
+          y: Math.random() * starCanvas.height,
+          radius: Math.random() * 1.5 + 0.5,
+          alpha: Math.random(),
+          speed: Math.random() * 0.02 + 0.005,
+          color: Math.random() > 0.4 ? '#f472b6' : (Math.random() > 0.5 ? '#38bdf8' : '#fbbf24')
+        });
+      }
+    }
+
+    function renderStars() {
+      ctx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+      stars.forEach(star => {
+        star.alpha += star.speed;
+        if (star.alpha > 1 || star.alpha < 0) {
+          star.speed = -star.speed;
+        }
+        ctx.save();
+        ctx.globalAlpha = Math.abs(star.alpha);
+        ctx.fillStyle = star.color;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+      requestAnimationFrame(renderStars);
+    }
+
+    window.addEventListener('resize', resizeStarCanvas);
+
+    /* ====================================================================
+       11. INITIALIZATION ON LOAD
+       ==================================================================== */
+    window.addEventListener('DOMContentLoaded', () => {
+      loadMasterData();
+      renderOrbit();
+      resizeStarCanvas();
+      renderStars();
+
+      // Enable audio on first user touch anywhere
+      const unlockAudio = () => {
+        sound.init();
+        document.removeEventListener('click', unlockAudio);
+        document.removeEventListener('touchstart', unlockAudio);
+      };
+      document.addEventListener('click', unlockAudio);
+      document.addEventListener('touchstart', unlockAudio);
+    });
+  </script>
+</body>
+</html>
